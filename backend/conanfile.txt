@@ -1,0 +1,19 @@
+[requires]
+# drogon/[*]
+# gtest/[*]
+# nlohmann_json/[*]
+# hiredis/[*]
+# jwt-cpp/[*]
+# openssl/[*]
+# simdjson/[*]
+# yaml-cpp/[*]
+# libpqxx/[*]
+# libbcrypt/[*]
+# quickjs/[*]
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout

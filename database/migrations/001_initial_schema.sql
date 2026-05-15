@@ -1,0 +1,3 @@
+-- Canonical runtime migrations now live under backend/migrations/.
+-- This file remains as a compatibility marker for earlier planning artifacts.
+-- See backend/migrations/001_initial.sql and subsequent files for the current schema.

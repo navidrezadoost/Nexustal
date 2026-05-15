@@ -1,0 +1,40 @@
+# Build artifacts
+build/
+out/
+dist/
+coverage/
+.cache/
+
+# Node
+node_modules/
+.nuxt/
+.output/
+
+# C++
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+compile_commands.json
+
+# Conan
+backend/build/
+parsers/**/build/
+
+# Emscripten
+wasm-libs/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
