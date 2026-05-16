@@ -12,6 +12,8 @@ class InvitationService
 {
 public:
     InvitationService(std::shared_ptr<domain::identity::IUserRepository> userRepository,
+                      std::shared_ptr<domain::identity::ITeamRepository> teamRepository,
+                      std::shared_ptr<domain::identity::IProjectRepository> projectRepository,
                       std::shared_ptr<domain::identity::IInvitationRepository> invitationRepository,
                       std::shared_ptr<domain::notification::INotificationService> notificationService);
 
@@ -29,6 +31,8 @@ public:
 
 private:
     std::shared_ptr<domain::identity::IUserRepository> userRepository_;
+    std::shared_ptr<domain::identity::ITeamRepository> teamRepository_;
+    std::shared_ptr<domain::identity::IProjectRepository> projectRepository_;
     std::shared_ptr<domain::identity::IInvitationRepository> invitationRepository_;
     std::shared_ptr<domain::notification::INotificationService> notificationService_;
 };

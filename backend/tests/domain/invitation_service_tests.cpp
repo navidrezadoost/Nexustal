@@ -14,9 +14,12 @@ namespace
 {
 using nexustal::domain::UUID;
 using nexustal::domain::identity::IInvitationRepository;
+using nexustal::domain::identity::IProjectRepository;
+using nexustal::domain::identity::ITeamRepository;
 using nexustal::domain::identity::IUserRepository;
 using nexustal::domain::identity::Invitation;
 using nexustal::domain::identity::InvitationStatus;
+using nexustal::domain::identity::UserRole;
 using nexustal::domain::identity::User;
 using nexustal::domain::identity::UserSearchCriteria;
 
@@ -122,6 +125,58 @@ public:
     std::vector<nexustal::domain::notification::Notification> notifications;
 };
 
+class FakeTeamRepository final : public ITeamRepository
+{
+public:
+    UUID create(const nexustal::domain::identity::Team&) override
+    {
+        return {};
+    }
+
+    std::optional<nexustal::domain::identity::Team> findById(const UUID&) override
+    {
+        return std::nullopt;
+    }
+
+    std::vector<nexustal::domain::identity::Team> findByOwner(const UUID&) override
+    {
+        return {};
+    }
+
+    bool addMember(const UUID& teamId, const UUID& userId, UserRole role) override
+    {
+        added_team_id = teamId;
+        added_user_id = userId;
+        added_role = role;
+        return true;
+    }
+
+    UUID added_team_id;
+    UUID added_user_id;
+    std::optional<UserRole> added_role;
+};
+
+class FakeProjectRepository final : public IProjectRepository
+{
+public:
+    std::optional<UserRole> findRoleForUser(const UUID&, const UUID&) override
+    {
+        return std::nullopt;
+    }
+
+    bool addMember(const UUID& projectId, const UUID& userId, UserRole role) override
+    {
+        added_project_id = projectId;
+        added_user_id = userId;
+        added_role = role;
+        return true;
+    }
+
+    UUID added_project_id;
+    UUID added_user_id;
+    std::optional<UserRole> added_role;
+};
+
 auto makeUser(std::string id, std::string username) -> User
 {
     return User{
@@ -139,13 +194,15 @@ auto makeUser(std::string id, std::string username) -> User
 TEST(InvitationServiceTest, SendInvitationCreatesPendingInvitationAndNotification)
 {
     auto users = std::make_shared<FakeUserRepository>();
+    auto teams = std::make_shared<FakeTeamRepository>();
+    auto projects = std::make_shared<FakeProjectRepository>();
     auto invitations = std::make_shared<FakeInvitationRepository>();
     auto notifications = std::make_shared<FakeNotificationService>();
 
     users->seed(makeUser("user-1", "alice"));
     users->seed(makeUser("user-2", "bob"));
 
-    nexustal::application::InvitationService service{users, invitations, notifications};
+    nexustal::application::InvitationService service{users, teams, projects, invitations, notifications};
     const auto invitationId = service.sendInvitation(
         "user-1",
         "user-2",
@@ -160,13 +217,15 @@ TEST(InvitationServiceTest, SendInvitationCreatesPendingInvitationAndNotificatio
 TEST(InvitationServiceTest, AcceptChangesPendingInvitationStatus)
 {
     auto users = std::make_shared<FakeUserRepository>();
+    auto teams = std::make_shared<FakeTeamRepository>();
+    auto projects = std::make_shared<FakeProjectRepository>();
     auto invitations = std::make_shared<FakeInvitationRepository>();
     auto notifications = std::make_shared<FakeNotificationService>();
 
     users->seed(makeUser("user-1", "alice"));
     users->seed(makeUser("user-2", "bob"));
 
-    nexustal::application::InvitationService service{users, invitations, notifications};
+    nexustal::application::InvitationService service{users, teams, projects, invitations, notifications};
     const auto invitationId = service.sendInvitation(
         "user-1",
         "user-2",
@@ -175,4 +234,9 @@ TEST(InvitationServiceTest, AcceptChangesPendingInvitationStatus)
 
     ASSERT_TRUE(service.accept(invitationId, "user-2"));
     EXPECT_TRUE(service.getPendingForUser("user-2").empty());
+    EXPECT_EQ(projects->added_project_id, "project-1");
+    EXPECT_EQ(projects->added_user_id, "user-2");
+    ASSERT_TRUE(projects->added_role.has_value());
+    EXPECT_EQ(projects->added_role.value(), nexustal::domain::identity::UserRole::Viewer);
+    EXPECT_EQ(notifications->notifications.size(), 2U);
 }

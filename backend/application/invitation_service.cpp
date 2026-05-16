@@ -9,9 +9,13 @@
 namespace nexustal::application
 {
 InvitationService::InvitationService(std::shared_ptr<domain::identity::IUserRepository> userRepository,
+                                     std::shared_ptr<domain::identity::ITeamRepository> teamRepository,
+                                     std::shared_ptr<domain::identity::IProjectRepository> projectRepository,
                                      std::shared_ptr<domain::identity::IInvitationRepository> invitationRepository,
                                      std::shared_ptr<domain::notification::INotificationService> notificationService)
     : userRepository_(std::move(userRepository))
+    , teamRepository_(std::move(teamRepository))
+    , projectRepository_(std::move(projectRepository))
     , invitationRepository_(std::move(invitationRepository))
     , notificationService_(std::move(notificationService))
 {
@@ -73,7 +77,40 @@ auto InvitationService::accept(const domain::UUID& invitationId, const domain::U
         return false;
     }
 
-    return invitationRepository_->updateStatus(invitationId, domain::identity::InvitationStatus::Accepted);
+    if (!invitationRepository_->updateStatus(invitationId, domain::identity::InvitationStatus::Accepted))
+    {
+        return false;
+    }
+
+    bool membershipPersisted = false;
+    if (iterator->team_id.has_value() && teamRepository_)
+    {
+        membershipPersisted = teamRepository_->addMember(iterator->team_id.value(), userId, iterator->role);
+    }
+    else if (iterator->project_id.has_value() && projectRepository_)
+    {
+        membershipPersisted = projectRepository_->addMember(iterator->project_id.value(), userId, iterator->role);
+    }
+
+    if (!membershipPersisted)
+    {
+        return false;
+    }
+
+    if (notificationService_)
+    {
+        notificationService_->sendNotification(domain::notification::Notification{
+            .id = domain::generate_uuid(),
+            .user_id = iterator->from_user_id,
+            .title = "Invitation accepted",
+            .message = "A user accepted your invitation.",
+            .type = "invitation_accepted",
+            .is_read = false,
+            .created_at = std::chrono::system_clock::now(),
+        });
+    }
+
+    return true;
 }
 
 auto InvitationService::reject(const domain::UUID& invitationId, const domain::UUID& userId) -> bool

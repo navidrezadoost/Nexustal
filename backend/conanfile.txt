@@ -9,7 +9,7 @@
 # yaml-cpp/[*]
 # libpqxx/[*]
 # libbcrypt/[*]
-# quickjs/[*]
+# quickjs/[*]  # optional: enable if the selected Conan remote provides a compatible recipe
 
 [generators]
 CMakeDeps

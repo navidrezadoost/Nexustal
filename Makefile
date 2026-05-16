@@ -5,10 +5,11 @@ BACKEND_BUILD_DIR := $(BACKEND_DIR)/build
 FRONTEND_DIR := $(ROOT_DIR)frontend/app
 COMPOSE_FILE := $(ROOT_DIR)docker-compose.yml
 
-.PHONY: help infra-up infra-down backend-configure backend-build backend-run backend-test frontend-install frontend-dev frontend-test wasm-build db-migrate parser-test perf ci docker-build deploy-plan
+.PHONY: help clean infra-up infra-down backend-configure backend-build backend-run backend-test frontend-install frontend-dev frontend-test wasm-build db-migrate parser-test perf ci docker-build deploy-plan
 
 help:
 	@echo "Nexustal command index"
+	@echo "  make clean               Remove backend build artifacts"
 	@echo "  make infra-up            Start PostgreSQL and Redis"
 	@echo "  make infra-down          Stop the self-hosted stack"
 	@echo "  make backend-configure   Configure backend build tree"
@@ -24,6 +25,9 @@ help:
 	@echo "  make perf               Placeholder performance suite"
 	@echo "  make ci                 Run the local CI sequence"
 
+clean:
+	rm -rf $(BACKEND_BUILD_DIR)
+
 infra-up:
 	@command -v docker >/dev/null || { echo "docker is required"; exit 1; }
 	docker compose -f $(COMPOSE_FILE) up -d --build
@@ -34,17 +38,19 @@ infra-down:
 
 backend-configure:
 	@command -v cmake >/dev/null || { echo "cmake is required"; exit 1; }
-	cmake -S $(BACKEND_DIR) -B $(BACKEND_BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
+	@command -v conan >/dev/null || { echo "conan is required"; exit 1; }
+	conan install $(BACKEND_DIR) --output-folder=$(BACKEND_BUILD_DIR) --build=missing -s build_type=Debug
+	cmake -S $(BACKEND_DIR) -B $(BACKEND_BUILD_DIR) -DCMAKE_TOOLCHAIN_FILE=$(BACKEND_BUILD_DIR)/conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
 
 backend-build: backend-configure
-	cmake --build $(BACKEND_BUILD_DIR) --target nexustal_engine
+	cmake --build $(BACKEND_BUILD_DIR) --parallel
 
 backend-run: backend-build
 	$(BACKEND_BUILD_DIR)/nexustal_engine
 
 backend-test: backend-configure
 	@command -v ctest >/dev/null || { echo "ctest is required"; exit 1; }
-	cmake --build $(BACKEND_BUILD_DIR) --target identity_tests wizard_service_tests auth_service_tests invitation_service_tests capabilities_tests
+	cmake --build $(BACKEND_BUILD_DIR) --parallel
 	ctest --test-dir $(BACKEND_BUILD_DIR) --output-on-failure
 
 frontend-install:

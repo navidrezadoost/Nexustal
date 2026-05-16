@@ -27,6 +27,16 @@ public:
     virtual UUID create(const Team& team) = 0;
     virtual std::optional<Team> findById(const UUID& id) = 0;
     virtual std::vector<Team> findByOwner(const UUID& owner_id) = 0;
+    virtual bool addMember(const UUID& team_id, const UUID& user_id, UserRole role) = 0;
+};
+
+class IProjectRepository
+{
+public:
+    virtual ~IProjectRepository() = default;
+
+    virtual std::optional<UserRole> findRoleForUser(const UUID& project_id, const UUID& user_id) = 0;
+    virtual bool addMember(const UUID& project_id, const UUID& user_id, UserRole role) = 0;
 };
 
 class IInvitationRepository

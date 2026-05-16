@@ -1,7 +1,10 @@
 #pragma once
 
 #include <drogon/HttpController.h>
-#include <drogon/nosql/RedisClient.h>
+
+#include <memory>
+
+#include "infrastructure/adapters/sse_connection_manager.hpp"
 
 namespace nexustal::controllers
 {
@@ -12,12 +15,12 @@ public:
     ADD_METHOD_TO(SseController::stream, "/api/notifications/stream", drogon::Get, "JwtAuthFilter");
     METHOD_LIST_END
 
-    static void configure(drogon::nosql::RedisClientPtr redis);
+    static void configure(std::shared_ptr<infrastructure::adapters::SseConnectionManager> connection_manager);
 
     void stream(const drogon::HttpRequestPtr& request,
                 std::function<void(const drogon::HttpResponsePtr&)>&& callback);
 
 private:
-    inline static drogon::nosql::RedisClientPtr redisClient_{};
+    inline static std::shared_ptr<infrastructure::adapters::SseConnectionManager> connection_manager_{};
 };
 } // namespace nexustal::controllers

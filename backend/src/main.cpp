@@ -1,16 +1,23 @@
 #include "application/auth_service.hpp"
+#include "application/endpoint_service.hpp"
 #include "application/invitation_service.hpp"
+#include "application/role_service.hpp"
 #include "application/wizard_service.hpp"
 #include "controllers/auth_controller.hpp"
+#include "controllers/endpoint_controller.hpp"
 #include "controllers/invitation_controller.hpp"
 #include "controllers/sse_controller.hpp"
 #include "controllers/wizard_controller.hpp"
 #include "filters/jwt_auth_filter.hpp"
 #include "infrastructure/adapters/bcrypt_password_hasher.hpp"
 #include "infrastructure/adapters/jwt_token_service.hpp"
+#include "infrastructure/adapters/postgres_endpoint_repository.hpp"
 #include "infrastructure/adapters/postgres_invitation_repository.hpp"
+#include "infrastructure/adapters/postgres_project_repository.hpp"
+#include "infrastructure/adapters/postgres_team_repository.hpp"
 #include "infrastructure/adapters/postgres_user_repository.hpp"
 #include "infrastructure/adapters/redis_notification_service.hpp"
+#include "infrastructure/adapters/sse_connection_manager.hpp"
 #include "nexustal/platform/migration_runner.hpp"
 
 #include <cstdlib>
@@ -73,17 +80,24 @@ int main()
         }
 
         auto userRepository = std::make_shared<nexustal::infrastructure::adapters::PostgresUserRepository>(dbClient);
+        auto teamRepository = std::make_shared<nexustal::infrastructure::adapters::PostgresTeamRepository>(dbClient);
+        auto projectRepository = std::make_shared<nexustal::infrastructure::adapters::PostgresProjectRepository>(dbClient);
         auto invitationRepository =
             std::make_shared<nexustal::infrastructure::adapters::PostgresInvitationRepository>(dbClient);
+        auto endpointRepository =
+            std::make_shared<nexustal::infrastructure::adapters::PostgresEndpointRepository>(dbClient);
         auto passwordHasher =
             std::make_shared<nexustal::infrastructure::adapters::BCryptPasswordHasher>();
         drogon::nosql::RedisClientPtr redisClient;
         std::shared_ptr<nexustal::domain::notification::INotificationService> notificationService;
+        std::shared_ptr<nexustal::infrastructure::adapters::SseConnectionManager> sseConnectionManager;
 
         try
         {
             redisClient = drogon::nosql::RedisClient::newRedisClient(redisHost, std::stoi(redisPort));
-            nexustal::controllers::SseController::configure(redisClient);
+            sseConnectionManager =
+                std::make_shared<nexustal::infrastructure::adapters::SseConnectionManager>(redisClient);
+            nexustal::controllers::SseController::configure(sseConnectionManager);
             notificationService =
                 std::make_shared<nexustal::infrastructure::adapters::RedisNotificationService>(redisClient);
         }
@@ -100,14 +114,20 @@ int main()
             userRepository,
             passwordHasher,
             tokenService);
+        auto roleService = std::make_shared<nexustal::application::RoleService>(projectRepository, redisClient);
+        auto endpointService =
+            std::make_shared<nexustal::application::EndpointService>(endpointRepository, roleService);
         auto invitationService = std::make_shared<nexustal::application::InvitationService>(
             userRepository,
+            teamRepository,
+            projectRepository,
             invitationRepository,
             notificationService);
         auto wizardService =
             std::make_shared<nexustal::application::WizardService>(userRepository, passwordHasher);
 
         nexustal::controllers::AuthController::configure(authService);
+        nexustal::controllers::EndpointController::configure(endpointService);
         nexustal::controllers::InvitationController::configure(invitationService);
         nexustal::controllers::WizardController::configure(wizardService);
         nexustal::filters::JwtAuthFilter::configure(authService, userRepository, redisClient);
